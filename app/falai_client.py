@@ -68,7 +68,13 @@ async def edit_image_with_falai(image_path: str, prompt: str):
             if "images" not in result:
                 print(f"Unexpected response structure. Missing 'images' key. Full response: {result}")
                 raise Exception(f"Unexpected response structure: {result}")
-                
+            
+            # Check if safety checker blocked the content
+            if "has_nsfw_concepts" in result and result["has_nsfw_concepts"]:
+                if any(result["has_nsfw_concepts"]):
+                    print(f"Safety checker blocked content: {result['has_nsfw_concepts']}")
+                    raise Exception(f"Safety checker blocked content: {result['has_nsfw_concepts']}")
+            
             return result
         except httpx.HTTPStatusError as e:
             print(f"HTTP error occurred: {e}")

@@ -104,6 +104,8 @@ async def create_job(background_tasks: BackgroundTasks, image: UploadFile = File
             else:
                 result_url = ""
                 print("No images found in response")
+                # Log the entire response for debugging
+                print(f"Full response when no images found: {resp_json}")
                 
             if not result_url:
                 print(f"No result URL found for job {jid}")
