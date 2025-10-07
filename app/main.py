@@ -18,7 +18,7 @@ if allowed_origins == "*":
 else:
     ALLOWED = allowed_origins.split(",")
 
-app = FastAPI(title="haybi-falai-backend")
+app = FastAPI(title="haybi-falai-backend", docs_url="/docs", redoc_url="/redoc")
 
 # Configure CORS middleware
 app.add_middleware(
@@ -32,6 +32,24 @@ app.add_middleware(
 
 UPLOAD_DIR = "./uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+# Root endpoint
+@app.get("/")
+async def root():
+    """
+    Root endpoint - provides basic information about the API
+    """
+    return {
+        "message": "Haybi Backend API",
+        "version": "1.0.0",
+        "docs": "/docs",
+        "health": "/health",
+        "endpoints": {
+            "create_job": "POST /api/jobs",
+            "get_job": "GET /api/jobs/{job_id}",
+            "list_jobs": "GET /api/jobs"
+        }
+    }
 
 @app.on_event("startup")
 async def startup():
@@ -112,4 +130,26 @@ async def list_jobs():
 # Health check endpoint
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy"}
+    """
+    Health check endpoint - returns the status of the service
+    """
+    return {"status": "healthy", "timestamp": __import__('datetime').datetime.utcnow().isoformat()}
+
+# API Info endpoint
+@app.get("/api/info")
+async def api_info():
+    """
+    API information endpoint
+    """
+    return {
+        "name": "Haybi Image Editing API",
+        "description": "API for editing images using AI",
+        "version": "1.0.0",
+        "endpoints": [
+            "POST /api/jobs - Create a new image editing job",
+            "GET /api/jobs - List all jobs",
+            "GET /api/jobs/{job_id} - Get job details",
+            "GET /health - Health check",
+            "GET / - API root information"
+        ]
+    }
