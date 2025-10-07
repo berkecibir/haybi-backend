@@ -17,6 +17,14 @@
 
 4) Deploy and get URL. Frontend will make requests to this URL.
 
+## CORS Configuration
+
+For development, you can set `ALLOWED_ORIGINS=*` to allow requests from any origin.
+For production, specify exact origins like:
+```
+ALLOWED_ORIGINS=https://yourdomain.com,https://www.yourdomain.com
+```
+
 ## Docker Deployment (Optional)
 
 You can also deploy using Docker:

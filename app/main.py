@@ -10,14 +10,24 @@ import aiofiles
 import traceback
 
 load_dotenv()
-ALLOWED = os.getenv("ALLOWED_ORIGINS", "*").split(",")
+
+# Handle CORS origins properly
+allowed_origins = os.getenv("ALLOWED_ORIGINS", "*")
+if allowed_origins == "*":
+    ALLOWED = ["*"]
+else:
+    ALLOWED = allowed_origins.split(",")
 
 app = FastAPI(title="haybi-falai-backend")
+
+# Configure CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED,
+    allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"]
+    allow_headers=["*"],
+    expose_headers=["*"]
 )
 
 UPLOAD_DIR = "./uploads"
