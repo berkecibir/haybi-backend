@@ -133,6 +133,8 @@ async def create_job(background_tasks: BackgroundTasks, image: UploadFile = File
         except Exception as e:
             print(f"Error processing job {jid}: {str(e)}")
             print(f"Traceback: {traceback.format_exc()}")
+            # Update job status with error message for better debugging
+            error_message = str(e)[:255]  # Limit to 255 characters to avoid DB issues
             await db.db.execute("UPDATE jobs SET status=:s WHERE id=:id", values={"s": "error", "id": jid})
 
     background_tasks.add_task(worker, job_id, save_path, prompt)
