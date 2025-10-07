@@ -92,16 +92,23 @@ async def create_job(background_tasks: BackgroundTasks, image: UploadFile = File
             print(f"Starting image editing for job {jid}")
             resp_json = await edit_image_with_falai(path, pr)
             print(f"Image editing completed for job {jid}")
+            print(f"Full response: {resp_json}")
             # Extract the result URL from the new response structure
             # The new response has an 'images' array with objects containing 'url' field
             images = resp_json.get("images", [])
+            print(f"Images array: {images}")
             if images and isinstance(images, list) and len(images) > 0:
                 result_url = images[0].get("url", "")
+                print(f"Extracted result URL: {result_url}")
             else:
                 result_url = ""
+                print("No images found in response")
                 
             if not result_url:
                 print(f"No result URL found for job {jid}")
+                # Log more details about why we couldn't find a result URL
+                if "error" in resp_json:
+                    print(f"Error in response: {resp_json['error']}")
                 await db.db.execute("UPDATE jobs SET status=:s WHERE id=:id", values={"s": "error", "id": jid})
             else:
                 print(f"Result URL for job {jid}: {result_url}")

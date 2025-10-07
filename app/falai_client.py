@@ -44,9 +44,31 @@ async def edit_image_with_falai(image_path: str, prompt: str):
             resp = await client.post(FALAI_URL, headers=headers, json=payload)
             print(f"Response status: {resp.status_code}")
             print(f"Response headers: {resp.headers}")
-            resp.raise_for_status()
-            result = resp.json()
-            print(f"Response JSON: {json.dumps(result, indent=2)}")
+            
+            # Check if the response is successful
+            if resp.status_code != 200:
+                print(f"Non-success status code: {resp.status_code}")
+                print(f"Response content: {resp.text}")
+                resp.raise_for_status()
+            
+            try:
+                result = resp.json()
+                print(f"Response JSON: {json.dumps(result, indent=2)}")
+            except json.JSONDecodeError as e:
+                print(f"Failed to decode JSON response: {e}")
+                print(f"Response content: {resp.text}")
+                raise Exception(f"Invalid JSON response: {resp.text}")
+            
+            # Check if the response contains error information
+            if "error" in result:
+                print(f"API returned error: {result['error']}")
+                raise Exception(f"API error: {result['error']}")
+            
+            # Check if the response has the expected structure
+            if "images" not in result:
+                print(f"Unexpected response structure. Missing 'images' key. Full response: {result}")
+                raise Exception(f"Unexpected response structure: {result}")
+                
             return result
         except httpx.HTTPStatusError as e:
             print(f"HTTP error occurred: {e}")

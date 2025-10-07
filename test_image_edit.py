@@ -14,7 +14,8 @@ image.save(test_image_path, 'PNG')
 
 # Test the image editing endpoint
 url = "http://127.0.0.1:8000/api/jobs"
-prompt = "Turn the red square into a blue circle"
+# Use the same prompt from the error logs
+prompt = "Create a cyberpunk version of the swans with neon lights and futuristic elements"
 
 with open(test_image_path, "rb") as f:
     files = {
