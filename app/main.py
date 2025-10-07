@@ -108,3 +108,8 @@ async def get_job(job_id: str):
 async def list_jobs():
     rows = await db.db.fetch_all("SELECT id,status,prompt,result_url FROM jobs ORDER BY rowid DESC")
     return [dict(r) for r in rows]
+
+# Health check endpoint
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
