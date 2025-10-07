@@ -1,8 +1,9 @@
 import os
 import uuid
 import shutil
-from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from . import db
 from .falai_client import edit_image_with_falai
@@ -20,14 +21,15 @@ else:
 
 app = FastAPI(title="haybi-falai-backend", docs_url="/docs", redoc_url="/redoc")
 
-# Configure CORS middleware
+# Configure CORS middleware with more permissive settings
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"]
+    expose_headers=["*"],
+    allow_origin_regex="https?://.*"  # Allow any HTTP/HTTPS origin
 )
 
 UPLOAD_DIR = "./uploads"
