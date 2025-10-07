@@ -25,6 +25,18 @@ For production, specify exact origins like:
 ALLOWED_ORIGINS=https://yourdomain.com,https://www.yourdomain.com
 ```
 
+## Health Check
+
+The backend includes a health check endpoint at `/health` that you can use to verify the service is running:
+```
+GET https://haybi-backend.onrender.com/health
+```
+
+This should return:
+```json
+{"status": "healthy"}
+```
+
 ## Docker Deployment (Optional)
 
 You can also deploy using Docker:
@@ -72,6 +84,24 @@ Future<Map<String, dynamic>> getJob(String jobId) async {
   throw Exception('Job fetch failed');
 }
 ```
+
+## Troubleshooting
+
+### "sunucuya bağlanılamadı" (Server connection failed) Error
+
+If you're getting this error, check:
+
+1. **Deployment Status**: Verify in Render dashboard that your service is deployed successfully
+2. **Environment Variables**: Ensure all required variables are set (FALAI_API_KEY, DATABASE_URL, ALLOWED_ORIGINS)
+3. **Start Command**: Make sure it's set to `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+4. **Health Check**: Visit `https://haybi-backend.onrender.com/health` to verify the service is running
+5. **CORS Configuration**: Ensure ALLOWED_ORIGINS includes your frontend origin
+
+### Common Issues and Solutions
+
+1. **Service not starting**: Check Render logs for error messages
+2. **CORS errors**: Verify ALLOWED_ORIGINS environment variable
+3. **Timeout errors**: The service might be slow to start on Render's free tier
 
 ## Notes
 
