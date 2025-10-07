@@ -32,7 +32,8 @@ app.add_middleware(
     allow_origin_regex="https?://.*"  # Allow any HTTP/HTTPS origin
 )
 
-UPLOAD_DIR = "./uploads"
+# Use absolute path for uploads directory to avoid issues in deployed environments
+UPLOAD_DIR = os.path.abspath("./uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # Root endpoint
@@ -78,10 +79,14 @@ async def create_job(background_tasks: BackgroundTasks, image: UploadFile = File
     filename = f"{job_id}_{image.filename}"
     save_path = os.path.join(UPLOAD_DIR, filename)
     
-    # Save the uploaded file
-    async with aiofiles.open(save_path, "wb") as f:
-        content = await image.read()
-        await f.write(content)
+    try:
+        # Save the uploaded file
+        async with aiofiles.open(save_path, "wb") as f:
+            content = await image.read()
+            await f.write(content)
+    except Exception as e:
+        print(f"Error saving file for job {job_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error saving file: {str(e)}")
 
     await db.db.execute(
         "INSERT INTO jobs(id,status,prompt,original_path) VALUES(:id,:status,:prompt,:path)",
@@ -91,6 +96,12 @@ async def create_job(background_tasks: BackgroundTasks, image: UploadFile = File
     async def worker(jid, path, pr):
         try:
             print(f"Starting image editing for job {jid}")
+            # Check if file exists before processing
+            if not os.path.exists(path):
+                print(f"File not found for job {jid}: {path}")
+                await db.db.execute("UPDATE jobs SET status=:s WHERE id=:id", values={"s": "error", "id": jid})
+                return
+                
             resp_json = await edit_image_with_falai(path, pr)
             print(f"Image editing completed for job {jid}")
             print(f"Full response: {resp_json}")
