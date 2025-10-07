@@ -38,7 +38,8 @@ async def edit_image_with_falai(image_data: bytes, prompt: str, max_retries=3):
         "acceleration": "regular"
     }
     
-    async with httpx.AsyncClient(timeout=120) as client:
+    # Set timeout to 120 seconds as requested
+    async with httpx.AsyncClient(timeout=120.0) as client:
         for attempt in range(max_retries):
             try:
                 print(f"Sending request to {FALAI_URL} (attempt {attempt + 1}/{max_retries})")
