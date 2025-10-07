@@ -32,77 +32,31 @@ app.add_middleware(
     allow_origin_regex="https?://.*"  # Allow any HTTP/HTTPS origin
 )
 
-# Use absolute path for uploads directory to avoid issues in deployed environments
-UPLOAD_DIR = os.path.abspath("./uploads")
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-# Root endpoint
-@app.get("/", status_code=200)
-@app.head("/", status_code=200)
-async def root():
-    """
-    Root endpoint - provides basic information about the API
-    """
-    return {
-        "message": "Haybi Backend API",
-        "version": "1.0.0",
-        "docs": "/docs",
-        "health": "/health",
-        "endpoints": {
-            "create_job": "POST /api/jobs",
-            "get_job": "GET /api/jobs/{job_id}",
-            "list_jobs": "GET /api/jobs"
-        }
-    }
-
-@app.on_event("startup")
-async def startup():
-    await db.db.connect()
-    # basit tablo
-    await db.db.execute("""
-    CREATE TABLE IF NOT EXISTS jobs(
-        id TEXT PRIMARY KEY,
-        status TEXT,
-        prompt TEXT,
-        original_path TEXT,
-        result_url TEXT
-    )""")
-
-@app.on_event("shutdown")
-async def shutdown():
-    await db.db.disconnect()
+# Remove file system dependency to avoid Render's ephemeral storage issues
+# We'll process images directly in memory now
 
 @app.post("/api/jobs", response_model=dict)
 async def create_job(background_tasks: BackgroundTasks, image: UploadFile = File(...), prompt: str = Form(...)):
     job_id = str(uuid.uuid4())
-    # Use only the filename, not the full path
-    filename = f"{job_id}_{image.filename}"
-    save_path = os.path.join(UPLOAD_DIR, filename)
     
     try:
-        # Save the uploaded file
-        async with aiofiles.open(save_path, "wb") as f:
-            content = await image.read()
-            await f.write(content)
+        # Read the image data directly into memory
+        image_data = await image.read()
+        print(f"Received image data of size: {len(image_data)} bytes")
     except Exception as e:
-        print(f"Error saving file for job {job_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error saving file: {str(e)}")
+        print(f"Error reading image data for job {job_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error reading image data: {str(e)}")
 
+    # Store job in database with pending status
     await db.db.execute(
         "INSERT INTO jobs(id,status,prompt,original_path) VALUES(:id,:status,:prompt,:path)",
-        values={"id": job_id, "status": "pending", "prompt": prompt, "path": save_path}
+        values={"id": job_id, "status": "pending", "prompt": prompt, "path": f"memory://{job_id}"}
     )
 
-    async def worker(jid, path, pr):
+    async def worker(jid, img_data, pr):
         try:
             print(f"Starting image editing for job {jid}")
-            # Check if file exists before processing
-            if not os.path.exists(path):
-                print(f"File not found for job {jid}: {path}")
-                await db.db.execute("UPDATE jobs SET status=:s WHERE id=:id", values={"s": "error", "id": jid})
-                return
-                
-            resp_json = await edit_image_with_falai(path, pr)
+            resp_json = await edit_image_with_falai(img_data, pr)
             print(f"Image editing completed for job {jid}")
             print(f"Full response: {resp_json}")
             # Extract the result URL from the new response structure
@@ -137,7 +91,7 @@ async def create_job(background_tasks: BackgroundTasks, image: UploadFile = File
             error_message = str(e)[:255]  # Limit to 255 characters to avoid DB issues
             await db.db.execute("UPDATE jobs SET status=:s WHERE id=:id", values={"s": "error", "id": jid})
 
-    background_tasks.add_task(worker, job_id, save_path, prompt)
+    background_tasks.add_task(worker, job_id, image_data, prompt)
     return {"job_id": job_id}
 
 @app.get("/api/jobs/{job_id}", response_model=dict)

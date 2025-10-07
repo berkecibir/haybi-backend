@@ -11,17 +11,19 @@ FALAI_KEY = os.getenv("FALAI_API_KEY")
 # Using the Qwen Image Edit Plus LoRA model for better image editing capabilities
 FALAI_URL = "https://fal.run/fal-ai/qwen-image-edit-plus-lora"
 
-async def edit_image_with_falai(image_path: str, prompt: str, max_retries=3):
+async def edit_image_with_falai(image_data: bytes, prompt: str, max_retries=3):
+    """
+    Process image directly with FalAI API using base64 encoded data
+    This eliminates the need for local file storage and avoids Render's ephemeral storage issues
+    """
     headers = {
         "Authorization": f"Key {FALAI_KEY}",
         "Content-Type": "application/json"
     }
     
-    # Read and encode the image as base64
-    with open(image_path, "rb") as f:
-        image_data = f.read()
-        image_base64 = base64.b64encode(image_data).decode('utf-8')
-        image_url = f"data:image/jpeg;base64,{image_base64}"
+    # Encode the image data as base64
+    image_base64 = base64.b64encode(image_data).decode('utf-8')
+    image_url = f"data:image/jpeg;base64,{image_base64}"
     
     # Prepare the payload according to Qwen Image Edit Plus LoRA API specification
     payload = {
