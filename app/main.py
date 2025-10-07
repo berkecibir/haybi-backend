@@ -36,7 +36,8 @@ UPLOAD_DIR = "./uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # Root endpoint
-@app.get("/")
+@app.get("/", status_code=200)
+@app.head("/", status_code=200)
 async def root():
     """
     Root endpoint - provides basic information about the API
@@ -137,7 +138,8 @@ async def list_jobs():
     return [dict(r) for r in rows]
 
 # Health check endpoint
-@app.get("/health")
+@app.get("/health", status_code=200)
+@app.head("/health", status_code=200)
 async def health_check():
     """
     Health check endpoint - returns the status of the service
@@ -145,7 +147,8 @@ async def health_check():
     return {"status": "healthy", "timestamp": __import__('datetime').datetime.utcnow().isoformat()}
 
 # API Info endpoint
-@app.get("/api/info")
+@app.get("/api/info", status_code=200)
+@app.head("/api/info", status_code=200)
 async def api_info():
     """
     API information endpoint
