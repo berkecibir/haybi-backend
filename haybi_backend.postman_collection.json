@@ -1,0 +1,176 @@
+{
+	"info": {
+		"_postman_id": "haybi-backend-api",
+		"name": "Haybi Backend API",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"description": "Collection for testing the Haybi Backend API"
+	},
+	"item": [
+		{
+			"name": "Get API Info",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "https://haybi-backend.onrender.com/api/info",
+					"protocol": "https",
+					"host": [
+						"haybi-backend",
+						"onrender",
+						"com"
+					],
+					"path": [
+						"api",
+						"info"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Health Status",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "https://haybi-backend.onrender.com/health",
+					"protocol": "https",
+					"host": [
+						"haybi-backend",
+						"onrender",
+						"com"
+					],
+					"path": [
+						"health"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Root Info",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "https://haybi-backend.onrender.com/",
+					"protocol": "https",
+					"host": [
+						"haybi-backend",
+						"onrender",
+						"com"
+					],
+					"path": [
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create Image Editing Job",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "image",
+							"type": "file",
+							"src": "/path/to/your/image.jpg"
+						},
+						{
+							"key": "prompt",
+							"value": "Your editing prompt here",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "https://haybi-backend.onrender.com/api/jobs",
+					"protocol": "https",
+					"host": [
+						"haybi-backend",
+						"onrender",
+						"com"
+					],
+					"path": [
+						"api",
+						"jobs"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "List All Jobs",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "https://haybi-backend.onrender.com/api/jobs",
+					"protocol": "https",
+					"host": [
+						"haybi-backend",
+						"onrender",
+						"com"
+					],
+					"path": [
+						"api",
+						"jobs"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Specific Job",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "https://haybi-backend.onrender.com/api/jobs/{{job_id}}",
+					"protocol": "https",
+					"host": [
+						"haybi-backend",
+						"onrender",
+						"com"
+					],
+					"path": [
+						"api",
+						"jobs",
+						"{{job_id}}"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "job_id",
+			"value": "replace_with_actual_job_id"
+		}
+	]
+}
