@@ -32,8 +32,73 @@ app.add_middleware(
     allow_origin_regex="https?://.*"  # Allow any HTTP/HTTPS origin
 )
 
+# Root endpoint - moved to be right after app initialization
+@app.get("/", status_code=200)
+@app.head("/", status_code=200)
+async def root():
+    """
+    Root endpoint - provides basic information about the API
+    """
+    return {
+        "message": "Haybi Backend API",
+        "version": "1.0.0",
+        "docs": "/docs",
+        "health": "/health",
+        "endpoints": {
+            "create_job": "POST /api/jobs",
+            "get_job": "GET /api/jobs/{job_id}",
+            "list_jobs": "GET /api/jobs"
+        }
+    }
+
 # Remove file system dependency to avoid Render's ephemeral storage issues
 # We'll process images directly in memory now
+
+# Health check endpoint
+@app.get("/health", status_code=200)
+@app.head("/health", status_code=200)
+async def health_check():
+    """
+    Health check endpoint - returns the status of the service
+    """
+    return {"status": "healthy", "timestamp": __import__('datetime').datetime.utcnow().isoformat()}
+
+# API Info endpoint
+@app.get("/api/info", status_code=200)
+@app.head("/api/info", status_code=200)
+async def api_info():
+    """
+    API information endpoint
+    """
+    return {
+        "name": "Haybi Image Editing API",
+        "description": "API for editing images using AI",
+        "version": "1.0.0",
+        "endpoints": [
+            "POST /api/jobs - Create a new image editing job",
+            "GET /api/jobs - List all jobs",
+            "GET /api/jobs/{job_id} - Get job details",
+            "GET /health - Health check",
+            "GET / - API root information"
+        ]
+    }
+
+@app.on_event("startup")
+async def startup():
+    await db.db.connect()
+    # basit tablo
+    await db.db.execute("""
+    CREATE TABLE IF NOT EXISTS jobs(
+        id TEXT PRIMARY KEY,
+        status TEXT,
+        prompt TEXT,
+        original_path TEXT,
+        result_url TEXT
+    )""")
+
+@app.on_event("shutdown")
+async def shutdown():
+    await db.db.disconnect()
 
 @app.post("/api/jobs", response_model=dict)
 async def create_job(background_tasks: BackgroundTasks, image: UploadFile = File(...), prompt: str = Form(...)):
@@ -105,32 +170,3 @@ async def get_job(job_id: str):
 async def list_jobs():
     rows = await db.db.fetch_all("SELECT id,status,prompt,result_url FROM jobs ORDER BY rowid DESC")
     return [dict(r) for r in rows]
-
-# Health check endpoint
-@app.get("/health", status_code=200)
-@app.head("/health", status_code=200)
-async def health_check():
-    """
-    Health check endpoint - returns the status of the service
-    """
-    return {"status": "healthy", "timestamp": __import__('datetime').datetime.utcnow().isoformat()}
-
-# API Info endpoint
-@app.get("/api/info", status_code=200)
-@app.head("/api/info", status_code=200)
-async def api_info():
-    """
-    API information endpoint
-    """
-    return {
-        "name": "Haybi Image Editing API",
-        "description": "API for editing images using AI",
-        "version": "1.0.0",
-        "endpoints": [
-            "POST /api/jobs - Create a new image editing job",
-            "GET /api/jobs - List all jobs",
-            "GET /api/jobs/{job_id} - Get job details",
-            "GET /health - Health check",
-            "GET / - API root information"
-        ]
-    }
