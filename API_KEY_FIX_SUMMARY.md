@@ -10,7 +10,7 @@ The application was returning a 500 error with the message `{"detail":"API key n
 ## Fixes Applied
 
 ### 1. Updated .env file
-- Set the correct API key value: `1314467c-294a-46d4-8b09-99a1538f9a7e:216a1cab54d1c1d0a7e87f7ff0e63a2b`
+- Set the correct API key value (see .env file)
 - Ensured the API key is properly formatted and matches the expected value
 - Added a comment indicating that this file should not be committed to version control
 
