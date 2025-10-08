@@ -1,4 +1,5 @@
 import os
+from dotenv import load_dotenv
 
 from fastapi import FastAPI, Request, UploadFile, File, HTTPException, Form, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,6 +12,9 @@ from typing import Optional, List
 from app.falai_client import FalAIClient
 from app.schemas import JobCreateResponse, Job
 from app.db import db, init_db, create_job, get_job, get_all_jobs, update_job_status
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = FastAPI()
 falai_client = FalAIClient()
