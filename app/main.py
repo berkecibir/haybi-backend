@@ -12,6 +12,18 @@ falai_client = FalAIClient()
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 
+# Root endpoint for API discoverability
+@app.get("/")
+async def root():
+    return {
+        "message": "Haybi Backend API",
+        "version": "1.0.0",
+        "docs": "/docs",
+        "endpoints": {
+            "image_edit": "/edit-image/"
+        }
+    }
+
 class ImageEditRequest(BaseModel):
     prompt: str
     image_base64: str
