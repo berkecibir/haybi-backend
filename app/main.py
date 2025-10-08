@@ -1,4 +1,5 @@
 from fastapi import FastAPI, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import logging
 import base64
@@ -11,6 +12,16 @@ falai_client = FalAIClient()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, replace with specific origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"]
+)
 
 # Root endpoint for API discoverability
 @app.get("/")
