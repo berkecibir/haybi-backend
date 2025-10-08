@@ -14,13 +14,49 @@ logging.basicConfig(level=logging.INFO)
 
 # Root endpoint for API discoverability
 @app.get("/")
+@app.head("/")
 async def root():
     return {
         "message": "Haybi Backend API",
         "version": "1.0.0",
         "docs": "/docs",
         "endpoints": {
-            "image_edit": "/edit-image/"
+            "image_edit": "/edit-image/",
+            "health": "/health",
+            "api_info": "/api/info"
+        }
+    }
+
+# Health check endpoint
+@app.get("/health")
+@app.head("/health")
+async def health_check():
+    return {"status": "healthy"}
+
+# API info endpoint
+@app.get("/api/info")
+@app.head("/api/info")
+async def api_info():
+    return {
+        "name": "Haybi Backend API",
+        "version": "1.0.0",
+        "description": "Backend API for Haybi image editing application",
+        "endpoints": {
+            "image_edit": {
+                "method": "POST",
+                "path": "/edit-image/",
+                "description": "Edit images using AI"
+            },
+            "health": {
+                "method": "GET",
+                "path": "/health",
+                "description": "Health check endpoint"
+            },
+            "api_info": {
+                "method": "GET",
+                "path": "/api/info",
+                "description": "API information endpoint"
+            }
         }
     }
 
