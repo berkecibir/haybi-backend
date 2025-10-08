@@ -5,7 +5,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import logging
 import base64
-import io
 import uuid
 import asyncio
 from typing import Optional, List
@@ -181,6 +180,11 @@ async def create_job_endpoint(request: Request, prompt: str = Form(...), image: 
     
     return JobCreateResponse(job_id=job_id)
 
+# Handle OPTIONS requests for CORS preflight
+@app.options("/api/jobs")
+async def options_jobs():
+    return {}
+
 # Get the status of a job
 @app.get("/api/jobs/{job_id}", response_model=Job)
 async def get_job_endpoint(job_id: str):
@@ -228,8 +232,6 @@ async def process_image_job(job_id: str, prompt: str, image: UploadFile):
     except Exception as e:
         logging.error(f"Error processing job {job_id}: {str(e)}", exc_info=True)
         await update_job_status(job_id, "failed")
-        logging.error(f"Error processing job {job_id}: {str(e)}", exc_info=True)
-
 
 """ from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
@@ -450,3 +452,4 @@ async def process_image_job(job_id: str, prompt: str, image: UploadFile):
         logging.error(f"Error processing job {job_id}: {str(e)}", exc_info=True)
         await update_job_status(job_id, "failed")
  """
+
