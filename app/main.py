@@ -1,11 +1,16 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import logging
 import base64
 import io
 import os
+import uuid
+import asyncio
+from typing import Optional
 from app.falai_client import FalAIClient
+from app.schemas import JobCreateResponse, Job
+from app.db import db
 
 app = FastAPI()
 falai_client = FalAIClient()
@@ -23,6 +28,17 @@ app.add_middleware(
     expose_headers=["*"]
 )
 
+# In-memory storage for jobs (in production, use a proper database)
+jobs = {}
+
+@app.on_event("startup")
+async def startup():
+    await db.connect()
+
+@app.on_event("shutdown")
+async def shutdown():
+    await db.disconnect()
+
 # Root endpoint for API discoverability
 @app.get("/")
 @app.head("/")
@@ -33,6 +49,8 @@ async def root():
         "docs": "/docs",
         "endpoints": {
             "image_edit": "/edit-image/",
+            "job_create": "/api/jobs",
+            "job_status": "/api/jobs/{job_id}",
             "health": "/health",
             "api_info": "/api/info"
         }
@@ -57,6 +75,16 @@ async def api_info():
                 "method": "POST",
                 "path": "/edit-image/",
                 "description": "Edit images using AI"
+            },
+            "job_create": {
+                "method": "POST",
+                "path": "/api/jobs",
+                "description": "Create a new image editing job"
+            },
+            "job_status": {
+                "method": "GET",
+                "path": "/api/jobs/{job_id}",
+                "description": "Get the status of an image editing job"
             },
             "health": {
                 "method": "GET",
@@ -106,3 +134,64 @@ async def edit_image(request: ImageEditRequest):
     except Exception as e:
         logging.error(f"Hata oluştu: {str(e)}", exc_info=True)
         return {"status": "error", "message": str(e)}
+
+# Create a new job for image editing
+@app.post("/api/jobs", response_model=JobCreateResponse)
+async def create_job(prompt: str, image: UploadFile = File(...)):
+    # Generate a unique job ID
+    job_id = str(uuid.uuid4())
+    
+    # Save job to in-memory storage
+    jobs[job_id] = {
+        "id": job_id,
+        "status": "pending",
+        "prompt": prompt,
+        "original_path": f"memory://{job_id}",
+        "result_url": None
+    }
+    
+    # Start processing the image in the background
+    asyncio.create_task(process_image_job(job_id, prompt, image))
+    
+    return JobCreateResponse(job_id=job_id)
+
+# Get the status of a job
+@app.get("/api/jobs/{job_id}", response_model=Job)
+async def get_job(job_id: str):
+    if job_id not in jobs:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    job = jobs[job_id]
+    return Job(
+        id=job["id"],
+        status=job["status"],
+        prompt=job["prompt"],
+        original_path=job["original_path"],
+        result_url=job["result_url"]
+    )
+
+# Background task to process the image
+async def process_image_job(job_id: str, prompt: str, image: UploadFile):
+    try:
+        # Update job status to processing
+        jobs[job_id]["status"] = "processing"
+        
+        # Read image data
+        image_data = await image.read()
+        
+        # Process with FalAI
+        logging.info(f"Processing job {job_id} with prompt: {prompt}")
+        result = await falai_client.process(prompt, image_data)
+        
+        # Update job with result
+        if result and hasattr(result, 'url'):
+            jobs[job_id]["status"] = "completed"
+            jobs[job_id]["result_url"] = result.url
+        else:
+            jobs[job_id]["status"] = "failed"
+            jobs[job_id]["result_url"] = None
+            
+    except Exception as e:
+        logging.error(f"Error processing job {job_id}: {str(e)}", exc_info=True)
+        jobs[job_id]["status"] = "failed"
+        jobs[job_id]["result_url"] = None
