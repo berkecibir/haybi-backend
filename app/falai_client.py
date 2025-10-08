@@ -4,6 +4,7 @@ import base64
 from dotenv import load_dotenv
 import json
 import asyncio
+import logging
 from typing import Optional
 
 load_dotenv()
@@ -52,52 +53,52 @@ class FalAIClient:
         async with httpx.AsyncClient(timeout=300.0) as client:
             for attempt in range(max_retries):
                 try:
-                    print(f"Sending request to {self.url} (attempt {attempt + 1}/{max_retries})")
-                    print(f"Headers: {headers}")
+                    logging.info(f"Sending request to {self.url} (attempt {attempt + 1}/{max_retries})")
+                    logging.debug(f"Headers: {headers}")
                     # Only log payload details on first attempt to avoid log spam
                     if attempt == 0:
-                        print(f"Payload: {json.dumps(payload, indent=2)}")
+                        logging.debug(f"Payload: {json.dumps(payload, indent=2)}")
                     
                     resp = await client.post(self.url, headers=headers, json=payload)
-                    print(f"Response status: {resp.status_code}")
-                    print(f"Response headers: {resp.headers}")
+                    logging.info(f"Response status: {resp.status_code}")
+                    logging.debug(f"Response headers: {resp.headers}")
                     
                     # Check if the response is successful
                     if resp.status_code != 200:
-                        print(f"Non-success status code: {resp.status_code}")
-                        print(f"Response content: {resp.text}")
+                        logging.warning(f"Non-success status code: {resp.status_code}")
+                        logging.debug(f"Response content: {resp.text}")
                         if attempt < max_retries - 1:
-                            print(f"Retrying in 2 seconds...")
+                            logging.info(f"Retrying in 2 seconds...")
                             await asyncio.sleep(2)
                             continue
                         resp.raise_for_status()
                     
                     try:
                         result = resp.json()
-                        print(f"Response JSON: {json.dumps(result, indent=2)}")
+                        logging.debug(f"Response JSON: {json.dumps(result, indent=2)}")
                     except json.JSONDecodeError as e:
-                        print(f"Failed to decode JSON response: {e}")
-                        print(f"Response content: {resp.text}")
+                        logging.error(f"Failed to decode JSON response: {e}")
+                        logging.debug(f"Response content: {resp.text}")
                         if attempt < max_retries - 1:
-                            print(f"Retrying in 2 seconds...")
+                            logging.info(f"Retrying in 2 seconds...")
                             await asyncio.sleep(2)
                             continue
                         raise Exception(f"Invalid JSON response: {resp.text}")
                     
                     # Check if the response contains error information
                     if "error" in result:
-                        print(f"API returned error: {result['error']}")
+                        logging.error(f"API returned error: {result['error']}")
                         if attempt < max_retries - 1:
-                            print(f"Retrying in 2 seconds...")
+                            logging.info(f"Retrying in 2 seconds...")
                             await asyncio.sleep(2)
                             continue
                         raise Exception(f"API error: {result['error']}")
                     
                     # Check if the response has the expected structure
                     if "images" not in result:
-                        print(f"Unexpected response structure. Missing 'images' key. Full response: {result}")
+                        logging.error(f"Unexpected response structure. Missing 'images' key. Full response: {result}")
                         if attempt < max_retries - 1:
-                            print(f"Retrying in 2 seconds...")
+                            logging.info(f"Retrying in 2 seconds...")
                             await asyncio.sleep(2)
                             continue
                         raise Exception(f"Unexpected response structure: {result}")
@@ -105,7 +106,7 @@ class FalAIClient:
                     # Check if safety checker blocked the content
                     if "has_nsfw_concepts" in result and result["has_nsfw_concepts"]:
                         if any(result["has_nsfw_concepts"]):
-                            print(f"Safety checker blocked content: {result['has_nsfw_concepts']}")
+                            logging.warning(f"Safety checker blocked content: {result['has_nsfw_concepts']}")
                             # Don't retry if safety checker blocked - it's unlikely to succeed on retry
                             raise Exception(f"Safety checker blocked content: {result['has_nsfw_concepts']}")
                     
@@ -117,26 +118,26 @@ class FalAIClient:
                         raise Exception("No images returned from FalAI")
                     
                 except httpx.TimeoutException as e:
-                    print(f"Timeout error occurred: {e}")
+                    logging.error(f"Timeout error occurred: {e}")
                     if attempt < max_retries - 1:
-                        print(f"Retrying in 2 seconds...")
+                        logging.info(f"Retrying in 2 seconds...")
                         await asyncio.sleep(2)
                         continue
                     raise Exception(f"Timeout after {max_retries} attempts: {e}")
                     
                 except httpx.HTTPStatusError as e:
-                    print(f"HTTP error occurred: {e}")
-                    print(f"Response content: {e.response.text}")
+                    logging.error(f"HTTP error occurred: {e}")
+                    logging.debug(f"Response content: {e.response.text}")
                     if attempt < max_retries - 1:
-                        print(f"Retrying in 2 seconds...")
+                        logging.info(f"Retrying in 2 seconds...")
                         await asyncio.sleep(2)
                         continue
                     raise
                     
                 except Exception as e:
-                    print(f"An error occurred: {e}")
+                    logging.error(f"An error occurred: {e}")
                     if attempt < max_retries - 1:
-                        print(f"Retrying in 2 seconds...")
+                        logging.info(f"Retrying in 2 seconds...")
                         await asyncio.sleep(2)
                         continue
                     raise

@@ -13,7 +13,7 @@ image = Image.new('RGB', (256, 256), color='red')
 image.save(test_image_path, 'PNG')
 
 # Test the image editing endpoint
-url = "http://127.0.0.1:8000/api/jobs"
+url = "http://127.0.0.1:8080/api/jobs"
 # Use the same prompt from the error logs
 prompt = "Create a cyberpunk version of the swans with neon lights and futuristic elements"
 

@@ -7,10 +7,10 @@ import io
 import os
 import uuid
 import asyncio
-from typing import Optional
+from typing import Optional, List
 from app.falai_client import FalAIClient
 from app.schemas import JobCreateResponse, Job
-from app.db import db
+from app.db import db, init_db, create_job, get_job, get_all_jobs, update_job_status
 
 app = FastAPI()
 falai_client = FalAIClient()
@@ -28,12 +28,10 @@ app.add_middleware(
     expose_headers=["*"]
 )
 
-# In-memory storage for jobs (in production, use a proper database)
-jobs = {}
-
 @app.on_event("startup")
 async def startup():
     await db.connect()
+    await init_db()
 
 @app.on_event("shutdown")
 async def shutdown():
@@ -122,22 +120,22 @@ async def edit_image(request: ImageEditRequest):
         # Check if result is valid and has URL
         if result is None:
             logging.error("FalAI returned None result")
-            return {"status": "error", "message": "FalAI returned None result"}
+            return {"status": "error", "message": "Image processing failed. Please try again."}
             
         if not hasattr(result, 'url') or result.url is None:
-            logging.error(f"FalAI result missing URL. Result: {result}")
-            return {"status": "error", "message": f"FalAI result missing URL. Result: {result}"}
+            logging.error(f"FalAI result missing URL.")
+            return {"status": "error", "message": "Image processing failed. Please try again with a different prompt."}
         
         logging.info("İşlem başarılı.")
         return {"status": "success", "result_url": result.url}
         
     except Exception as e:
         logging.error(f"Hata oluştu: {str(e)}", exc_info=True)
-        return {"status": "error", "message": str(e)}
+        return {"status": "error", "message": "An error occurred during image processing. Please try again."}
 
 # Create a new job for image editing
 @app.post("/api/jobs", response_model=JobCreateResponse)
-async def create_job(prompt: str = Form(...), image: UploadFile = File(...)):
+async def create_job_endpoint(prompt: str = Form(...), image: UploadFile = File(...)):
     logging.info(f"Job creation request received. Prompt: {prompt}, Image filename: {image.filename}, Content type: {image.content_type}")
     
     # Validate image
@@ -151,14 +149,8 @@ async def create_job(prompt: str = Form(...), image: UploadFile = File(...)):
     job_id = str(uuid.uuid4())
     logging.info(f"Generated job ID: {job_id}")
     
-    # Save job to in-memory storage
-    jobs[job_id] = {
-        "id": job_id,
-        "status": "pending",
-        "prompt": prompt,
-        "original_path": f"memory://{job_id}",
-        "result_url": None
-    }
+    # Save job to database
+    await create_job(job_id, prompt, f"memory://{job_id}")
     
     # Start processing the image in the background
     asyncio.create_task(process_image_job(job_id, prompt, image))
@@ -167,29 +159,30 @@ async def create_job(prompt: str = Form(...), image: UploadFile = File(...)):
 
 # Get the status of a job
 @app.get("/api/jobs/{job_id}", response_model=Job)
-async def get_job(job_id: str):
+async def get_job_endpoint(job_id: str):
     logging.info(f"Job status request received. Job ID: {job_id}")
     
-    if job_id not in jobs:
+    job = await get_job(job_id)
+    if not job:
         logging.error(f"Job not found: {job_id}")
         raise HTTPException(status_code=404, detail="Job not found")
     
-    job = jobs[job_id]
-    logging.info(f"Job status: {job}")
-    return Job(
-        id=job["id"],
-        status=job["status"],
-        prompt=job["prompt"],
-        original_path=job["original_path"],
-        result_url=job["result_url"]
-    )
+    logging.info(f"Job status: {dict(job)}")
+    return Job(**dict(job))
+
+# List all jobs
+@app.get("/api/jobs", response_model=List[Job])
+async def list_jobs():
+    logging.info("Listing all jobs")
+    jobs = await get_all_jobs()
+    return [Job(**dict(job)) for job in jobs]
 
 # Background task to process the image
 async def process_image_job(job_id: str, prompt: str, image: UploadFile):
     try:
         logging.info(f"Starting image processing for job {job_id}")
         # Update job status to processing
-        jobs[job_id]["status"] = "processing"
+        await update_job_status(job_id, "processing")
         
         # Read image data
         image_data = await image.read()
@@ -202,15 +195,12 @@ async def process_image_job(job_id: str, prompt: str, image: UploadFile):
         
         # Update job with result
         if result and result.url:
-            jobs[job_id]["status"] = "completed"
-            jobs[job_id]["result_url"] = result.url
+            await update_job_status(job_id, "completed", result.url)
             logging.info(f"Job {job_id} completed successfully. Result URL: {result.url}")
         else:
-            jobs[job_id]["status"] = "failed"
-            jobs[job_id]["result_url"] = None
+            await update_job_status(job_id, "failed")
             logging.error(f"Job {job_id} failed. No result URL returned from FalAI.")
             
     except Exception as e:
         logging.error(f"Error processing job {job_id}: {str(e)}", exc_info=True)
-        jobs[job_id]["status"] = "failed"
-        jobs[job_id]["result_url"] = None
+        await update_job_status(job_id, "failed")
