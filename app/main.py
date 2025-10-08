@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import logging
@@ -137,9 +137,19 @@ async def edit_image(request: ImageEditRequest):
 
 # Create a new job for image editing
 @app.post("/api/jobs", response_model=JobCreateResponse)
-async def create_job(prompt: str, image: UploadFile = File(...)):
+async def create_job(prompt: str = Form(...), image: UploadFile = File(...)):
+    logging.info(f"Job creation request received. Prompt: {prompt}, Image filename: {image.filename}, Content type: {image.content_type}")
+    
+    # Validate image
+    if not image:
+        raise HTTPException(status_code=400, detail="No image provided")
+    
+    if not prompt:
+        raise HTTPException(status_code=400, detail="No prompt provided")
+    
     # Generate a unique job ID
     job_id = str(uuid.uuid4())
+    logging.info(f"Generated job ID: {job_id}")
     
     # Save job to in-memory storage
     jobs[job_id] = {
@@ -158,10 +168,14 @@ async def create_job(prompt: str, image: UploadFile = File(...)):
 # Get the status of a job
 @app.get("/api/jobs/{job_id}", response_model=Job)
 async def get_job(job_id: str):
+    logging.info(f"Job status request received. Job ID: {job_id}")
+    
     if job_id not in jobs:
+        logging.error(f"Job not found: {job_id}")
         raise HTTPException(status_code=404, detail="Job not found")
     
     job = jobs[job_id]
+    logging.info(f"Job status: {job}")
     return Job(
         id=job["id"],
         status=job["status"],
@@ -173,23 +187,28 @@ async def get_job(job_id: str):
 # Background task to process the image
 async def process_image_job(job_id: str, prompt: str, image: UploadFile):
     try:
+        logging.info(f"Starting image processing for job {job_id}")
         # Update job status to processing
         jobs[job_id]["status"] = "processing"
         
         # Read image data
         image_data = await image.read()
+        logging.info(f"Image data read. Size: {len(image_data)} bytes")
         
         # Process with FalAI
         logging.info(f"Processing job {job_id} with prompt: {prompt}")
         result = await falai_client.process(prompt, image_data)
+        logging.info(f"FalAI processing result: {result}")
         
         # Update job with result
-        if result and hasattr(result, 'url'):
+        if result and hasattr(result, 'url') and result.url:
             jobs[job_id]["status"] = "completed"
             jobs[job_id]["result_url"] = result.url
+            logging.info(f"Job {job_id} completed successfully. Result URL: {result.url}")
         else:
             jobs[job_id]["status"] = "failed"
             jobs[job_id]["result_url"] = None
+            logging.error(f"Job {job_id} failed. No result URL returned from FalAI.")
             
     except Exception as e:
         logging.error(f"Error processing job {job_id}: {str(e)}", exc_info=True)
