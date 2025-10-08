@@ -17,7 +17,14 @@ from app.db import db, init_db, create_job, get_job, get_all_jobs, update_job_st
 load_dotenv()
 
 app = FastAPI()
-falai_client = FalAIClient()
+
+# Initialize FalAI client with error handling
+try:
+    falai_client = FalAIClient()
+    logging.info("FalAI client initialized successfully")
+except ValueError as e:
+    logging.error(f"Failed to initialize FalAI client: {e}")
+    falai_client = None
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -36,6 +43,12 @@ app.add_middleware(
 
 # Required API key for authentication (loaded from environment variable)
 REQUIRED_API_KEY = os.getenv("API_KEY")
+
+# Log API key status for debugging
+if REQUIRED_API_KEY:
+    logging.info(f"API key loaded successfully: {REQUIRED_API_KEY[:10]}...")
+else:
+    logging.warning("API key not found in environment variables")
 
 # Authentication dependency
 def verify_auth(authorization: str = Header(...)):
@@ -246,6 +259,11 @@ async def process_image_job(job_id: str, prompt: str, image: UploadFile):
         
         # Process with FalAI
         logging.info(f"Processing job {job_id} with prompt: {prompt}")
+        if falai_client is None:
+            logging.error(f"FalAI client is not initialized. Cannot process job {job_id}")
+            await update_job_status(job_id, "failed")
+            return
+            
         result = await falai_client.process(prompt, image_data)
         logging.info(f"FalAI processing result: {result}")
         
@@ -465,6 +483,11 @@ async def process_image_job(job_id: str, prompt: str, image: UploadFile):
         
         # Process with FalAI
         logging.info(f"Processing job {job_id} with prompt: {prompt}")
+        if falai_client is None:
+            logging.error(f"FalAI client is not initialized. Cannot process job {job_id}")
+            await update_job_status(job_id, "failed")
+            return
+            
         result = await falai_client.process(prompt, image_data)
         logging.info(f"FalAI processing result: {result}")
         

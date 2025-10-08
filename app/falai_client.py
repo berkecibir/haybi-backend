@@ -10,6 +10,12 @@ from typing import Optional
 load_dotenv()
 FALAI_KEY = os.getenv("FALAI_API_KEY")
 
+# Log API key status for debugging
+if FALAI_KEY:
+    logging.info(f"FalAI API key loaded successfully: {FALAI_KEY[:10]}...")
+else:
+    logging.warning("FalAI API key not found in environment variables")
+
 # Using the Qwen Image Edit Plus LoRA model for better image editing capabilities
 FALAI_URL = "https://fal.run/fal-ai/qwen-image-edit-plus-lora"
 
@@ -21,16 +27,29 @@ class FalAIClient:
     def __init__(self):
         self.api_key = FALAI_KEY
         self.url = FALAI_URL
+        
+        if not self.api_key:
+            logging.error("FalAI API key is not configured. Please set FALAI_API_KEY environment variable.")
+            raise ValueError("FalAI API key is not configured. Please set FALAI_API_KEY environment variable.")
+        
+        # Check if API key is a placeholder
+        if self.api_key in ["your_falai_api_key_here", "your_actual_falai_api_key", "placeholder"]:
+            logging.error(f"FalAI API key appears to be a placeholder: {self.api_key}")
+            raise ValueError("FalAI API key is set to a placeholder value. Please set a real FALAI_API_KEY environment variable.")
     
     async def process(self, prompt: str, image_data: bytes, max_retries=3):
         """
         Process image directly with FalAI API using base64 encoded data
         This eliminates the need for local file storage and avoids Render's ephemeral storage issues
         """
+        # Try different authentication methods
         headers = {
             "Authorization": f"Key {self.api_key}",
             "Content-Type": "application/json"
         }
+        
+        # Log the headers for debugging (without exposing the full API key)
+        logging.debug(f"Request headers: Authorization: Key {self.api_key[:10]}...")
         
         # Encode the image data as base64
         image_base64 = base64.b64encode(image_data).decode('utf-8')
@@ -60,6 +79,27 @@ class FalAIClient:
                         logging.debug(f"Payload: {json.dumps(payload, indent=2)}")
                     
                     resp = await client.post(self.url, headers=headers, json=payload)
+                    
+                    # If authentication fails, try alternative authentication methods
+                    if resp.status_code == 401 and attempt == 0:
+                        logging.warning("Authentication failed with 'Key' format, trying alternative methods...")
+                        
+                        # Try with Bearer format
+                        alt_headers = {
+                            "Authorization": f"Bearer {self.api_key}",
+                            "Content-Type": "application/json"
+                        }
+                        logging.info("Trying Bearer authentication...")
+                        resp = await client.post(self.url, headers=alt_headers, json=payload)
+                        
+                        if resp.status_code == 401:
+                            # Try with X-API-Key header
+                            alt_headers = {
+                                "X-API-Key": self.api_key,
+                                "Content-Type": "application/json"
+                            }
+                            logging.info("Trying X-API-Key authentication...")
+                            resp = await client.post(self.url, headers=alt_headers, json=payload)
                     logging.info(f"Response status: {resp.status_code}")
                     logging.debug(f"Response headers: {resp.headers}")
                     
@@ -67,6 +107,17 @@ class FalAIClient:
                     if resp.status_code != 200:
                         logging.warning(f"Non-success status code: {resp.status_code}")
                         logging.debug(f"Response content: {resp.text}")
+                        
+                        # Handle specific authentication errors
+                        if resp.status_code == 401:
+                            logging.error("Authentication failed. Please check your FALAI_API_KEY.")
+                            if "Authentication is required" in resp.text:
+                                logging.error("The API key may be invalid or the authentication format may be incorrect.")
+                            raise Exception(f"Authentication failed: {resp.text}")
+                        elif resp.status_code == 403:
+                            logging.error("Access forbidden. The API key may not have permission to access this endpoint.")
+                            raise Exception(f"Access forbidden: {resp.text}")
+                        
                         if attempt < max_retries - 1:
                             logging.info(f"Retrying in 2 seconds...")
                             await asyncio.sleep(2)
