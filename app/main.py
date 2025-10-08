@@ -21,7 +21,7 @@ logging.basicConfig(level=logging.INFO)
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://haybi-backend.onrender.com", "http://localhost:8080"],  # Belirli origin'ler
+    allow_origins=["https://haybi-backend.onrender.com", "http://localhost:8000"],  # Belirli origin'ler
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
