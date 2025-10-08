@@ -10,11 +10,13 @@ from typing import Optional
 load_dotenv()
 FALAI_KEY = os.getenv("FALAI_API_KEY")
 
-# Log API key status for debugging
-if FALAI_KEY:
+# Log API key status for debugging (only if key exists)
+if FALAI_KEY and FALAI_KEY not in ["your_falai_api_key_here", "your_actual_falai_api_key", "placeholder"]:
     logging.info(f"FalAI API key loaded successfully: {FALAI_KEY[:10]}...")
+elif FALAI_KEY:
+    logging.warning("FalAI API key appears to be a placeholder value")
 else:
-    logging.warning("FalAI API key not found in environment variables")
+    logging.info("FalAI API key not configured - will be required when processing images")
 
 # Using the Qwen Image Edit Plus LoRA model for better image editing capabilities
 FALAI_URL = "https://fal.run/fal-ai/qwen-image-edit-plus-lora"

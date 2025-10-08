@@ -18,13 +18,10 @@ load_dotenv()
 
 app = FastAPI()
 
-# Initialize FalAI client with error handling
-try:
-    falai_client = FalAIClient()
-    logging.info("FalAI client initialized successfully")
-except ValueError as e:
-    logging.error(f"Failed to initialize FalAI client: {e}")
-    falai_client = None
+# FalAI client initialization disabled - will be initialized on demand
+# This prevents the backend from requiring FALAI_API_KEY at startup
+falai_client = None
+logging.info("FalAI client initialization deferred - will be created when needed")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -259,8 +256,15 @@ async def process_image_job(job_id: str, prompt: str, image: UploadFile):
         
         # Process with FalAI
         logging.info(f"Processing job {job_id} with prompt: {prompt}")
-        if falai_client is None:
-            logging.error(f"FalAI client is not initialized. Cannot process job {job_id}")
+        
+        # Initialize FalAI client on demand
+        try:
+            if falai_client is None:
+                logging.info("Initializing FalAI client for job processing...")
+                falai_client = FalAIClient()
+                logging.info("FalAI client initialized successfully")
+        except ValueError as e:
+            logging.error(f"Failed to initialize FalAI client: {e}")
             await update_job_status(job_id, "failed")
             return
             
@@ -483,8 +487,15 @@ async def process_image_job(job_id: str, prompt: str, image: UploadFile):
         
         # Process with FalAI
         logging.info(f"Processing job {job_id} with prompt: {prompt}")
-        if falai_client is None:
-            logging.error(f"FalAI client is not initialized. Cannot process job {job_id}")
+        
+        # Initialize FalAI client on demand
+        try:
+            if falai_client is None:
+                logging.info("Initializing FalAI client for job processing...")
+                falai_client = FalAIClient()
+                logging.info("FalAI client initialized successfully")
+        except ValueError as e:
+            logging.error(f"Failed to initialize FalAI client: {e}")
             await update_job_status(job_id, "failed")
             return
             
