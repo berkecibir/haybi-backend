@@ -1,71 +1,124 @@
-# Haybi Backend - AI Image Editing API
+# Haybi Backend API
 
-This is the backend service for the Haybi AI Image Editing application. It provides a REST API for processing images using the fal.ai API.
+This is the backend API for the Haybi image editing application, built with FastAPI.
 
 ## Features
 
-- Image editing using fal.ai's Qwen Image Edit Plus LoRA model
-- Asynchronous job processing with status tracking
-- RESTful API with proper error handling
-- Database persistence for job history
-- CORS support for web frontend integration
+- Image editing using Fal.ai API
+- Job tracking system
+- Authentication with API key
+- CORS support for web applications
 
-## API Endpoints
+## Requirements
 
-### Direct Image Editing
-- `POST /edit-image/` - Direct image editing (synchronous)
-  - Request body: JSON with `prompt` and `image_base64`
+- Python 3.8+
+- FastAPI
+- Uvicorn
+- Other dependencies listed in [requirements.txt](requirements.txt)
 
-### Job-based Image Editing
-- `POST /api/jobs` - Create a new image editing job (asynchronous)
-  - Form data: `prompt` (text) and `image` (file)
-  - Response: JSON with `job_id`
-- `GET /api/jobs/{job_id}` - Get the status and result of a job
-- `GET /api/jobs` - List all jobs
+## Installation
 
-### Utility Endpoints
-- `GET /` - API root with endpoint information
-- `GET /health` - Health check endpoint
-- `GET /api/info` - Detailed API information
+1. Clone the repository:
+   ```bash
+   git clone <repository-url>
+   cd haybi-backend
+   ```
 
-## Setup
-
-1. Clone the repository
 2. Create a virtual environment:
    ```bash
    python -m venv haybi-env
    source haybi-env/bin/activate  # On Windows: haybi-env\Scripts\activate
    ```
+
 3. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
-4. Create a `.env` file based on `.env.example` and fill in your values:
+
+4. Create a `.env` file with your configuration:
    ```bash
    cp .env.example .env
    ```
-5. Set your fal.ai API key in the `.env` file
+   Then edit the `.env` file to add your Fal.ai API key and other configuration.
 
 ## Running the Application
 
+To run the application in development mode:
 ```bash
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+uvicorn app.main:app --reload
 ```
+
+The API will be available at `http://127.0.0.1:8000`.
+
+## API Endpoints
+
+### Authentication
+
+All endpoints require authentication with an API key in the Authorization header:
+```
+Authorization: Bearer YOUR_API_KEY
+```
+
+### POST /edit-image/
+
+Submit an image for editing.
+
+**Request:**
+- Method: POST
+- Content-Type: multipart/form-data
+- Parameters:
+  - `image`: The image file to edit
+  - `prompt`: Text prompt describing the desired edit
+
+**Response:**
+```json
+{
+  "job_id": "uuid-string"
+}
+```
+
+### GET /edit-image/{job_id}
+
+Get the status of an image editing job.
+
+**Request:**
+- Method: GET
+- Path Parameter: `job_id` - The ID of the job to check
+
+**Response:**
+```json
+{
+  "id": "job_id",
+  "status": "completed|processing|failed",
+  "prompt": "string",
+  "original_path": "string",
+  "result_url": "string"
+}
+```
+
+## Error Codes
+
+- `401`: Unauthorized - Invalid or missing API key
+- `422`: Unprocessable Entity - Invalid request data
+- `500`: Internal Server Error - Server-side error
 
 ## Deployment
 
-The application is configured for deployment on Render.com. See `README_DEPLOY_RENDER.md` for detailed deployment instructions.
+The application can be deployed to any platform that supports Python applications. For Render deployment, see [README_DEPLOY_RENDER.md](README_DEPLOY_RENDER.md).
 
 ## Environment Variables
 
-- `FALAI_API_KEY` - Your fal.ai API key
-- `DATABASE_URL` - Database connection URL (default: SQLite)
-- `ALLOWED_ORIGINS` - Comma-separated list of allowed CORS origins
+- `API_KEY`: Your Fal.ai API key (required)
+- `DATABASE_URL`: Database connection URL (default: sqlite+aiosqlite:///./jobs.db)
+- `ALLOWED_ORIGINS`: CORS allowed origins (default: *)
 
-## Database
+## Security
 
-The application uses SQLite for development and can be configured to use PostgreSQL for production deployments.
+- Never commit your `.env` file to version control
+- Use strong, unique API keys
+- Rotate API keys regularly
+- Use HTTPS in production
 
-## Logging
+## License
 
-The application uses Python's built-in logging module. Log levels can be configured through the logging configuration.
+This project is licensed under the MIT License.

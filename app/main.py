@@ -1,6 +1,6 @@
 import os
 
-from fastapi import FastAPI, Request, UploadFile, File, HTTPException, Form
+from fastapi import FastAPI, Request, UploadFile, File, HTTPException, Form, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import logging
@@ -18,36 +18,34 @@ falai_client = FalAIClient()
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 
-# Read env var (örnek: "https://haybi-backend.onrender.com,http://localhost:8080")
-allowed_origins_env = os.getenv(
-    "ALLOWED_ORIGINS",
-    "https://haybi-backend.onrender.com,http://localhost:8000,http://localhost:8080"
-)
-
-# Build origins list
-if allowed_origins_env.strip() == "*":
-    origins = ["*"]
-else:
-    origins = [o.strip() for o in allowed_origins_env.split(",") if o.strip()]
-
-# If wildcard used, disallow credentials (browsers block wildcard + credentials)
-allow_credentials = False if origins == ["*"] else True
-
-# Explicit headers (daha güvenli)
-allowed_headers = ["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"]
-exposed_headers = ["Content-Length", "X-Request-Id"]
-
-logging.info(f"CORS origins: {origins}, allow_credentials: {allow_credentials}")
+# Configure CORS to allow all origins, specific methods and all headers as required
+origins = ["*"]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=allow_credentials,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=allowed_headers,
-    expose_headers=exposed_headers,
-    max_age=3600,
+    allow_credentials=False,  # Must be False when allow_origins="*"
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+    expose_headers=[],
 )
+
+# Required API key for authentication (loaded from environment variable)
+REQUIRED_API_KEY = os.getenv("API_KEY")
+
+# Authentication dependency
+def verify_auth(authorization: str = Header(...)):
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header format")
+    
+    token = authorization[len("Bearer "):]
+    if not REQUIRED_API_KEY:
+        raise HTTPException(status_code=500, detail="API key not configured on server")
+    
+    if token != REQUIRED_API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid API key")
+    
+    return True
 
 @app.on_event("startup")
 async def startup():
@@ -118,41 +116,45 @@ async def api_info():
         }
     }
 
-class ImageEditRequest(BaseModel):
-    prompt: str
-    image_base64: str
-
 @app.post("/edit-image/")
-async def edit_image(request: ImageEditRequest):
-    logging.info(f"Gelen prompt: {request.prompt}")
+async def edit_image(
+    image: UploadFile = File(...),
+    prompt: str = Form(...),
+    auth: bool = Depends(verify_auth)
+):
+    logging.info(f"Received image edit request with prompt: {prompt}")
     
     try:
-        # Decode base64 image data
-        image_data = base64.b64decode(request.image_base64)
-        logging.info(f"Decoded image data length: {len(image_data)} bytes")
+        # Validate image
+        if not image:
+            raise HTTPException(status_code=422, detail="No image provided")
         
-        # Process with FalAI
-        logging.info("FalAI client processing started...")
-        result = await falai_client.process(request.prompt, image_data)
+        if not prompt:
+            raise HTTPException(status_code=422, detail="No prompt provided")
         
-        # Log the result object for debugging
-        logging.info(f"Raw result from FalAI: {result}")
+        # Generate a unique job ID
+        job_id = str(uuid.uuid4())
+        logging.info(f"Generated job ID: {job_id}")
         
-        # Check if result is valid and has URL
-        if result is None:
-            logging.error("FalAI returned None result")
-            return {"status": "error", "message": "Image processing failed. Please try again."}
-            
-        if not hasattr(result, 'url') or result.url is None:
-            logging.error(f"FalAI result missing URL.")
-            return {"status": "error", "message": "Image processing failed. Please try again with a different prompt."}
+        # Save job to database
+        await create_job(job_id, prompt, f"memory://{job_id}")
         
-        logging.info("İşlem başarılı.")
-        return {"status": "success", "result_url": result.url}
+        # Read image data
+        image_data = await image.read()
+        logging.info(f"Image data read. Size: {len(image_data)} bytes")
         
+        # Start processing the image in the background
+        asyncio.create_task(process_image_job(job_id, prompt, image))
+        
+        # Return job ID immediately
+        return {"job_id": job_id}
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
-        logging.error(f"Hata oluştu: {str(e)}", exc_info=True)
-        return {"status": "error", "message": "An error occurred during image processing. Please try again."}
+        logging.error(f"Error occurred: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="An error occurred during image processing. Please try again.")
 
 # Create a new job for image editing
 @app.post("/api/jobs", response_model=JobCreateResponse)
@@ -197,6 +199,28 @@ async def get_job_endpoint(job_id: str):
     
     logging.info(f"Job status: {dict(job)}")
     return Job(**dict(job))
+
+# Get the status of an image edit job
+@app.get("/edit-image/{job_id}")
+async def get_edit_image_job_status(
+    job_id: str,
+    auth: bool = Depends(verify_auth)
+):
+    logging.info(f"Image edit job status request received. Job ID: {job_id}")
+    
+    job = await get_job(job_id)
+    if not job:
+        logging.error(f"Job not found: {job_id}")
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Return the job status in the required format
+    return {
+        "id": job["id"],
+        "status": job["status"],
+        "prompt": job["prompt"],
+        "original_path": job["original_path"],
+        "result_url": job["result_url"]
+    }
 
 # List all jobs
 @app.get("/api/jobs", response_model=List[Job])
