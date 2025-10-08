@@ -201,7 +201,7 @@ async def process_image_job(job_id: str, prompt: str, image: UploadFile):
         logging.info(f"FalAI processing result: {result}")
         
         # Update job with result
-        if result and hasattr(result, 'url') and result.url:
+        if result and result.url:
             jobs[job_id]["status"] = "completed"
             jobs[job_id]["result_url"] = result.url
             logging.info(f"Job {job_id} completed successfully. Result URL: {result.url}")

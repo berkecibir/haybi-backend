@@ -4,12 +4,17 @@ import base64
 from dotenv import load_dotenv
 import json
 import asyncio
+from typing import Optional
 
 load_dotenv()
 FALAI_KEY = os.getenv("FALAI_API_KEY")
 
 # Using the Qwen Image Edit Plus LoRA model for better image editing capabilities
 FALAI_URL = "https://fal.run/fal-ai/qwen-image-edit-plus-lora"
+
+class FalAIResult:
+    def __init__(self, url: Optional[str] = None):
+        self.url = url
 
 class FalAIClient:
     def __init__(self):
@@ -104,7 +109,12 @@ class FalAIClient:
                             # Don't retry if safety checker blocked - it's unlikely to succeed on retry
                             raise Exception(f"Safety checker blocked content: {result['has_nsfw_concepts']}")
                     
-                    return result
+                    # Extract URL from the images array
+                    if result["images"] and len(result["images"]) > 0:
+                        image_url = result["images"][0]["url"]
+                        return FalAIResult(url=image_url)
+                    else:
+                        raise Exception("No images returned from FalAI")
                     
                 except httpx.TimeoutException as e:
                     print(f"Timeout error occurred: {e}")
