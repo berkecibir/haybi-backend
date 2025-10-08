@@ -12,6 +12,10 @@
         "destination": "https://haybi-backend.onrender.com/edit-image/**"
       },
       {
+        "source": "/api/**",
+        "destination": "https://haybi-backend.onrender.com/api/**"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

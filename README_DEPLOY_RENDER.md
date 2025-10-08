@@ -11,7 +11,8 @@
    - Start Command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
 
 3) Environment Variables:
-   - FALAI_API_KEY
+   - API_KEY (optional but recommended for security)
+   - FALAI_API_KEY (required for image processing)
    - DATABASE_URL
    - ALLOWED_ORIGINS
 
@@ -24,6 +25,14 @@ For production, specify exact origins like:
 ```
 ALLOWED_ORIGINS=https://yourdomain.com,https://www.yourdomain.com
 ```
+
+## Authentication
+
+The backend now supports flexible authentication:
+- `/api/jobs` endpoint does NOT require authentication (for easier frontend integration)
+- `/edit-image/` endpoint DOES require authentication (for security)
+
+If API_KEY is not configured on the server, authentication is skipped automatically.
 
 ## Health Check
 
@@ -85,6 +94,24 @@ Future<Map<String, dynamic>> getJob(String jobId) async {
 }
 ```
 
+### Create Job with Authentication (if API_KEY is configured): `POST /edit-image/` multipart/form-data
+```dart
+Future<String?> createJobWithAuth(File imageFile, String prompt, String apiKey) async {
+  var uri = Uri.parse('https://haybi-backend.onrender.com/edit-image/');
+  var req = http.MultipartRequest('POST', uri);
+  req.headers['Authorization'] = 'Bearer $apiKey';
+  req.fields['prompt'] = prompt;
+  req.files.add(await http.MultipartFile.fromPath('image', imageFile.path));
+  var res = await req.send();
+  if (res.statusCode == 200) {
+    final body = await res.stream.bytesToString();
+    return jsonDecode(body)['job_id'];
+  } else {
+    throw Exception('Job creation failed: ${res.statusCode}');
+  }
+}
+```
+
 ## Troubleshooting
 
 ### "sunucuya bağlanılamadı" (Server connection failed) Error
@@ -102,6 +129,7 @@ If you're getting this error, check:
 1. **Service not starting**: Check Render logs for error messages
 2. **CORS errors**: Verify ALLOWED_ORIGINS environment variable
 3. **Timeout errors**: The service might be slow to start on Render's free tier
+4. **Authentication errors**: Check if API_KEY is properly configured
 
 ## Notes
 

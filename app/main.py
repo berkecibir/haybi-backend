@@ -27,15 +27,20 @@ logging.info("FalAI client initialization deferred - will be created when needed
 logging.basicConfig(level=logging.INFO)
 
 # Configure CORS to allow all origins, specific methods and all headers as required
-origins = ["*"]
+# Use ALLOWED_ORIGINS environment variable if set, otherwise use default origins
+allowed_origins = os.getenv("ALLOWED_ORIGINS", "*")
+if allowed_origins == "*":
+    origins = ["*"]
+else:
+    origins = [origin.strip() for origin in allowed_origins.split(",")]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=False,  # Must be False when allow_origins="*"
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_credentials=True,
+    allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=[],
+    expose_headers=["*"],
 )
 
 # Required API key for authentication (loaded from environment variable)
@@ -47,14 +52,21 @@ if REQUIRED_API_KEY:
 else:
     logging.warning("API key not found in environment variables")
 
-# Authentication dependency
-def verify_auth(authorization: str = Header(...)):
+# Authentication dependency - Modified to handle cases where API key is not configured
+def verify_auth(authorization: str = Header(None)):
+    # If no API key is configured on the server, skip authentication
+    if not REQUIRED_API_KEY or REQUIRED_API_KEY == "":
+        logging.warning("API key not configured on server - skipping authentication")
+        return True
+    
+    # If no authorization header is provided, reject the request
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Authorization header missing")
+    
     if not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Invalid authorization header format")
     
     token = authorization[len("Bearer "):]
-    if not REQUIRED_API_KEY:
-        raise HTTPException(status_code=500, detail="API key not configured on server")
     
     if token != REQUIRED_API_KEY:
         raise HTTPException(status_code=401, detail="Invalid API key")
@@ -170,7 +182,7 @@ async def edit_image(
         logging.error(f"Error occurred: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="An error occurred during image processing. Please try again.")
 
-# Create a new job for image editing
+# Create a new job for image editing (no authentication required)
 @app.post("/api/jobs", response_model=JobCreateResponse)
 async def create_job_endpoint(request: Request, prompt: str = Form(...), image: UploadFile = File(...)):
     origin = request.headers.get("origin")
